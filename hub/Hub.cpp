@@ -22,7 +22,7 @@ void Hub::setKey(std::string const& key)
 #define INTER 10000
 void Hub::registerObserver(server::HttpServer& httpServer)
 {
-    httpServer.registerObserver("/faucet", [this] (std::string, std::string body, server::URLRequestCallback urlRC) {
+    httpServer.registerObserver("faucet", [this] (std::string, std::string body, server::URLRequestCallback urlRC) {
         std::string ret;
         bool allowed = false;
         {
