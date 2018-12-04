@@ -29,6 +29,7 @@ void Hub::registerObserver(server::HttpServer& httpServer)
             {
                 Transaction tx;
                 Json::Value jRet;
+                jRet["status"] = 0;
                 jRet["txHash"] = toJS(tx.getHash());
                 jRet["value"] = value;
                 ret = jRet.toStyledString();
