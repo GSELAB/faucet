@@ -4,10 +4,17 @@
 
 #include <config/Argument.h>
 #include <hub/Hub.h>
+#include <utils/Utils.h>
+#include <core/Log.h>
 
 using namespace config;
+using namespace core;
 using namespace hub;
 using namespace server;
+using namespace utils;
+
+Hub* _hub;
+HttpServer* _server;
 
 void initArgument()
 {
@@ -22,6 +29,7 @@ bool isRunning = true;
 void signalHandler(int signal)
 {
     std::string reason;
+    isRunning = false;
     switch (signal) {
         case SIGABRT:
             reason = "SIGABRT";
@@ -37,8 +45,29 @@ void signalHandler(int signal)
             break;
     }
 
+    if (_server) {
+        _server->stop();
+        delete _server;
+        _server = NULL;
+    }
+
+    if (_hub) {
+        delete _hub;
+        _hub = NULL;
+    }
+
+
     std::cout << "exit by signal " << reason << "\n";
-    isRunning = false;
+}
+
+bool shouldExit()
+{
+    return isRunning == false;
+}
+
+void doCheck()
+{
+    sleepMilliseconds(2000);
 }
 
 int main(int argc, char** argv)
@@ -47,16 +76,10 @@ int main(int argc, char** argv)
     signal(SIGTERM, &signalHandler);
     signal(SIGINT, &signalHandler);
     initArgument();
-    Hub hub(ARG.m_rpcIP, ARG.m_rpcPort);
-    HttpServer server(ARG.m_localPort, 256);
-
-    hub.registerObserver(server);
-    server.start();
-
-    while (isRunning) {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-    }
-
-    server.stop();
+    _hub = new Hub(ARG.m_rpcIP, ARG.m_rpcPort);
+    _server = new HttpServer(ARG.m_localPort, 256);
+    _hub->registerObserver(*_server);
+    _server->start();
+    std::cout << "Faucet exit!\n";
     return 0;
 }

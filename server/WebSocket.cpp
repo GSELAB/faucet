@@ -57,6 +57,7 @@ void WebSocket::startService()
 
 bool WebSocket::shutdown()
 {
+    m_server.stop();
     return true;
 }
 
