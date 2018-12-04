@@ -2,9 +2,11 @@
 #include <hub/JsonRequest.h>
 #include <core/Log.h>
 #include <core/JsonHelper.h>
+#include <utils/Utils.h>
 
 using namespace core;
 using namespace core::js_util;
+using namespace utils;
 
 namespace hub {
 
@@ -12,31 +14,52 @@ enum URLCode {
     Default = 200,
 };
 
+void Hub::setKey(std::string const& key)
+{
+
+}
+
+#define INTER 10000
 void Hub::registerObserver(server::HttpServer& httpServer)
 {
     httpServer.registerObserver("/faucet", [this] (std::string, std::string body, server::URLRequestCallback urlRC) {
         std::string ret;
-        Json::Reader reader(Json::Features::strictMode());
-        Json::Value root;
-        if (reader.parse(body, root)) {
-            std::string addressString = root["address"].asString();
-            Address address(addressString);
-            uint64_t value = (m_random() % 100000);
-            value = value * 1000000;
+        bool allowed = false;
+        {
+            Guard l{x_timestamp};
+            int64_t timestamp = currentTimestamp();
+            if (timestamp > m_timestamp + INTER) {
+                allowed = true;
+                m_timestamp = timestamp;
+            }
+        }
 
-            CINFO << "address:" << address << "\tvalue:" << value;
+        if (!allowed) {
+            Json::Value jRet;
+            jRet["status"] = 1;
+            jRet["txHash"] = "";
+            jRet["value"] = 0;
+            ret = jRet.toStyledString();
+        } else {
+            Json::Reader reader(Json::Features::strictMode());
+            Json::Value root;
+            if (reader.parse(body, root)) {
+                std::string addressString = root["address"].asString();
+                Address address(addressString);
+                uint64_t value = (m_random() % 100000);
+                value = value * 1000000;
 
-            {
-                Transaction tx;
+                CINFO << "Send to address:" << address << "\tvalue:" << value;
+                transfer(address, value);
                 Json::Value jRet;
                 jRet["status"] = 0;
-                jRet["txHash"] = toJS(tx.getHash());
-                jRet["value"] = value;
+                jRet["txHash"] = toJS(m_tx.getHash());
+                jRet["value"] = m_tx.getValue();
                 ret = jRet.toStyledString();
+            } else {
+                ret = "Parse body failed, invalid format.\n";
+                CINFO << ret;
             }
-        } else {
-            ret = "Parse body failed, invalid format.\n";
-            CINFO << ret;
         }
 
         urlRC(URLCode::Default, ret);
@@ -77,17 +100,17 @@ void Hub::broadcast(core::Transaction& transaction)
     });
 }
 
-void Hub::transfer(std::string const& recipient, uint64_t value)
+void Hub::transfer(Address const& recipient, uint64_t value)
 {
     try {
-        Address recipientAddress(recipient);
-        Json::Value requestTransfer = toRequestTransfer(m_key.getAddress(), recipientAddress, value);
+        Json::Value requestTransfer = toRequestTransfer(m_key.getAddress(), recipient, value);
         send("/create_transaction", requestTransfer, [this] (std::string const& buffer) {
             Json::Reader reader(Json::Features::strictMode());
             Json::Value root;
             if(reader.parse(buffer, root)) {
                 Transaction tx = toTransaction(root);
                 tx.sign(m_key.getSecret());
+                m_tx = tx;
                 broadcast(tx);
             } else {
                 std::cout << "Parse json error\n";

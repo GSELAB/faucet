@@ -76,7 +76,8 @@ int main(int argc, char** argv)
     signal(SIGTERM, &signalHandler);
     signal(SIGINT, &signalHandler);
     initArgument();
-    _hub = new Hub(ARG.m_rpcIP, ARG.m_rpcPort);
+    Secret secret("");
+    _hub = new Hub(secret, ARG.m_rpcIP, ARG.m_rpcPort);
     _server = new HttpServer(ARG.m_localPort, 256);
     _hub->registerObserver(*_server);
     _server->start();
