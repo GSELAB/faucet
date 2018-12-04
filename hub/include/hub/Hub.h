@@ -1,4 +1,6 @@
 #include <string>
+#include <random>
+#include <time.h>
 
 #include <beast/http.hpp>
 #include <beast/core.hpp>
@@ -17,7 +19,9 @@ namespace hub {
 class Hub {
 public:
     Hub(std::string const& host, std::string const& port, int version = 11):
-        m_rpcHost(host), m_rpcPort(port), m_version(version) {}
+        m_rpcHost(host), m_rpcPort(port), m_version(version) {
+        m_random.seed(time(0));
+    }
 
     virtual ~Hub() {}
 
@@ -39,6 +43,7 @@ private:
     boost::asio::ip::tcp::resolver m_resolver{m_ios};
     boost::asio::ip::tcp::socket m_socket{m_ios};
 
+    std::default_random_engine m_random;
     crypto::GKey m_key;
 };
 }

@@ -4,6 +4,7 @@
 #include <core/JsonHelper.h>
 
 using namespace core;
+using namespace core::js_util;
 
 namespace hub {
 
@@ -20,10 +21,18 @@ void Hub::registerObserver(server::HttpServer& httpServer)
         if (reader.parse(body, root)) {
             std::string addressString = root["address"].asString();
             Address address(addressString);
-            CINFO << "Address:" << address;
+            uint64_t value = (m_random() % 100000);
+            value = value * 1000000;
 
+            CINFO << "address:" << address << "\tvalue:" << value;
 
-
+            {
+                Transaction tx;
+                Json::Value jRet;
+                jRet["txHash"] = toJS(tx.getHash());
+                jRet["value"] = value;
+                ret = jRet.toStyledString();
+            }
         } else {
             ret = "Parse body failed, invalid format.\n";
             CINFO << ret;
