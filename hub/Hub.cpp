@@ -24,26 +24,26 @@ void Hub::registerObserver(server::HttpServer& httpServer)
 {
     httpServer.registerObserver("/faucet", [this] (std::string, std::string body, server::URLRequestCallback urlRC) {
         std::string ret;
-        bool allowed = false;
-        {
-            Guard l{x_timestamp};
-            int64_t timestamp = currentTimestamp();
-            if (timestamp > m_timestamp + INTER) {
-                allowed = true;
-                m_timestamp = timestamp;
+        Json::Reader reader(Json::Features::strictMode());
+        Json::Value root;
+        if (reader.parse(body, root)) {
+            bool allowed = false;
+            {
+                Guard l{x_timestamp};
+                int64_t timestamp = currentTimestamp();
+                if (timestamp > m_timestamp + INTER) {
+                    allowed = true;
+                    m_timestamp = timestamp;
+                }
             }
-        }
 
-        if (!allowed) {
-            Json::Value jRet;
-            jRet["status"] = 1;
-            jRet["txHash"] = "";
-            jRet["value"] = 0;
-            ret = jRet.toStyledString();
-        } else {
-            Json::Reader reader(Json::Features::strictMode());
-            Json::Value root;
-            if (reader.parse(body, root)) {
+            if (!allowed) {
+                Json::Value jRet;
+                jRet["status"] = 1;
+                jRet["txHash"] = "";
+                jRet["value"] = 0;
+                ret = jRet.toStyledString();
+            } else {
                 std::string addressString = root["address"].asString();
                 Address address(addressString);
                 uint64_t value = (m_random() % 100000);
@@ -56,10 +56,9 @@ void Hub::registerObserver(server::HttpServer& httpServer)
                 jRet["txHash"] = toJS(m_tx.getHash());
                 jRet["value"] = m_tx.getValue();
                 ret = jRet.toStyledString();
-            } else {
-                ret = "Parse body failed, invalid format.\n";
-                CINFO << ret;
             }
+        } else {
+            ret = "Parse body failed, invalid format.\n";
         }
 
         urlRC(URLCode::Default, ret);
